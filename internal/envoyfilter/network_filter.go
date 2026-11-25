@@ -66,11 +66,11 @@ func generateNetworkFilter(
 			operation)
 	}
 
-	WorkloadSelector := inboundEnvoyFilterWorkloadSelector(service)
+	WorkloadSelector := InboundEnvoyFilterWorkloadSelector(service)
 
 	// a workload selector should be set in an inbound envoy filter, so we won't override the inbound config of other
 	// services at the same port
-	if inboundProxy != nil && hasInboundWorkloadSelector(WorkloadSelector) {
+	if inboundProxy != nil && HasInboundWorkloadSelector(WorkloadSelector) {
 		inboundEnvoyFilters := generateInboundListenerEnvoyFilters(service, port, inboundProxy, filterName, filterType,
 			operation,
 			WorkloadSelector)
@@ -165,11 +165,15 @@ func generateInboundListenerEnvoyFilters(service *model.ServiceEntryWrapper, por
 	return envoyFilters
 }
 
-func hasInboundWorkloadSelector(selector *networking.WorkloadSelector) bool {
+// HasInboundWorkloadSelector reports whether the selector actually selects any workload.
+func HasInboundWorkloadSelector(selector *networking.WorkloadSelector) bool {
 	return len(selector.Labels) != 0
 }
 
-func inboundEnvoyFilterWorkloadSelector(service *model.ServiceEntryWrapper) *networking.WorkloadSelector {
+// InboundEnvoyFilterWorkloadSelector resolves the workload selector of an inbound EnvoyFilter,
+// falling back to the "workloadSelector" annotation of the ServiceEntry when no explicit selector
+// labels are set.
+func InboundEnvoyFilterWorkloadSelector(service *model.ServiceEntryWrapper) *networking.WorkloadSelector {
 	selector := service.Spec.WorkloadSelector
 	if selector == nil || selector.Labels == nil {
 		selector = &networking.WorkloadSelector{
@@ -177,7 +181,13 @@ func inboundEnvoyFilterWorkloadSelector(service *model.ServiceEntryWrapper) *net
 		}
 	}
 	if len(selector.Labels) == 0 {
+		// Ignore an absent or blank annotation: otherwise the split below would produce a bogus
+		// "app": "" label, which would make HasInboundWorkloadSelector always return true and cause
+		// inbound EnvoyFilters to be generated even when no workload is selected.
 		label := strings.ReplaceAll(service.Annotations["workloadSelector"], " ", "")
+		if label == "" {
+			return selector
+		}
 		labelSlice := strings.Split(label, ":")
 		if len(labelSlice) == 1 {
 			selector.Labels["app"] = label

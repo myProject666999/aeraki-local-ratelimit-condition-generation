@@ -79,10 +79,33 @@ func Test_inboudEnvoyFilterWorkloadSelector(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "no workload selector and no annotation returns empty labels",
+			service: &model.ServiceEntryWrapper{
+				Spec: &networking.ServiceEntry{},
+			},
+			want: &networking.WorkloadSelector{
+				Labels: map[string]string{},
+			},
+		},
+		{
+			name: "blank workload selector annotation returns empty labels",
+			service: &model.ServiceEntryWrapper{
+				Meta: istioconfig.Meta{
+					Annotations: map[string]string{
+						"workloadSelector": "   ",
+					},
+				},
+				Spec: &networking.ServiceEntry{},
+			},
+			want: &networking.WorkloadSelector{
+				Labels: map[string]string{},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := inboundEnvoyFilterWorkloadSelector(tt.service); !reflect.DeepEqual(got, tt.want) {
+			if got := InboundEnvoyFilterWorkloadSelector(tt.service); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("inboudEnvoyFilterWorkloadSelector() = %v, want %v", got, tt.want)
 			}
 		})
